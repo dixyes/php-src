@@ -77,7 +77,7 @@ static BOOL WINAPI php_win32_signal_system_ctrl_handler(DWORD evt)
 		return FALSE;
 	}
 
-	(void)InterlockedExchange8(vm_interrupt_flag, 1);
+	(void)_InterlockedExchange8(vm_interrupt_flag, 1);
 
 	ctrl_evt = evt;
 
