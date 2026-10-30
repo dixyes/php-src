@@ -47,6 +47,10 @@
 
 #include "jit/zend_jit_internal.h"
 
+#if defined(ZTS) && (defined(__x86_64__) || defined(__aarch64__))
+# include "jit/tls/zend_jit_tls.h"
+#endif
+
 #ifdef HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
 #include <pthread.h>
 #endif

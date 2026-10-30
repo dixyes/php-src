@@ -2807,18 +2807,16 @@ static int zend_jit_setup(void)
 		tsrm_tls_index = (tlsdesc->index + 1) * 8;
 	}
 # elif defined(__MUSL__)
-	if (tsrm_ls_cache_tcb_offset == 0) {
-		size_t **where;
-
-		__asm__(
-			"adrp %0, :tlsdesc:_tsrm_ls_cache\n"
-			"add %0, %0, :tlsdesc_lo12:_tsrm_ls_cache\n"
-			: "=r" (where));
-		/* See https://github.com/ARM-software/abi-aa/blob/2a70c42d62e9c3eb5887fa50b71257f20daca6f9/aaelf64/aaelf64.rst */
-		size_t *tlsdesc = where[1];
-
-		tsrm_tls_offset = tlsdesc[1];
-		tsrm_tls_index = tlsdesc[0] * 8;
+	if (tsrm_ls_cache_tcb_offset == 0
+			&& zend_jit_resolve_tsrm_ls_cache_offsets(
+				&tsrm_ls_cache_tcb_offset, &tsrm_tls_index, &tsrm_tls_offset) == FAILURE) {
+		/* The resolver only fails when the linker rewrote the TLS descriptor
+		 * sequence into a form it does not recognize. Re-running the hand
+		 * written sequence here would read a partially relaxed descriptor,
+		 * which is the very bug this resolver fixes, so give up instead and
+		 * let the caller disable the JIT. */
+		zend_accel_error(ACCEL_LOG_WARNING, "Could not resolve _tsrm_ls_cache TLS offsets");
+		return FAILURE;
 	}
 # else
 	ZEND_ASSERT(tsrm_ls_cache_tcb_offset != 0);
