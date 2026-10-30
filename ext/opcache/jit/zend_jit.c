@@ -47,6 +47,10 @@
 
 #include "jit/zend_jit_internal.h"
 
+#if defined(__x86_64__) && defined(ZTS)
+# include "jit/tls/zend_jit_tls.h"
+#endif
+
 #ifdef ZTS
 int jit_globals_id;
 #else

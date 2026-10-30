@@ -56,6 +56,7 @@ if test "$PHP_OPCACHE" != "no"; then
         IR_TARGET=IR_TARGET_X64
         DASM_FLAGS="-D X64=1"
         DASM_ARCH="x86"
+        TLS_TARGET="x86_64"
         ;;
       i[[34567]]86*)
         DASM_ARCH="x86"
@@ -71,6 +72,10 @@ if test "$PHP_OPCACHE" != "no"; then
 
     if test "$PHP_THREAD_SAFETY" = "yes"; then
       DASM_FLAGS="$DASM_FLAGS -D ZTS=1"
+    fi
+
+    if test "$PHP_THREAD_SAFETY" = "yes" && test -n "$TLS_TARGET"; then
+      ZEND_JIT_SRC="$ZEND_JIT_SRC jit/tls/zend_jit_tls_$TLS_TARGET.c"
     fi
 
     PKG_CHECK_MODULES([CAPSTONE], [capstone >= 3.0.0],
@@ -342,6 +347,9 @@ int main() {
 
   if test "$PHP_OPCACHE_JIT" = "yes"; then
     PHP_ADD_BUILD_DIR([$ext_builddir/jit], 1)
+    if test "$PHP_THREAD_SAFETY" = "yes" && test -n "$TLS_TARGET"; then
+      PHP_ADD_BUILD_DIR([$ext_builddir/jit/tls])
+    fi
     PHP_ADD_MAKEFILE_FRAGMENT($ext_srcdir/jit/Makefile.frag)
   fi
   PHP_SUBST(OPCACHE_SHARED_LIBADD)

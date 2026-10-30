@@ -2970,6 +2970,14 @@ static int zend_jit_setup(void)
 		asm ("movq _tsrm_ls_cache@gottpoff(%%rip),%0"
 			: "=r" (ret));
 		tsrm_ls_cache_tcb_offset = ret;
+#elif defined(__MUSL__)
+		if (zend_jit_resolve_tsrm_ls_cache_offsets(
+				&tsrm_ls_cache_tcb_offset, &tsrm_tls_index, &tsrm_tls_offset) == FAILURE) {
+			/* the resolver gives up on an unknown linker relaxation, the caller
+			 * disables the JIT when setup fails */
+			zend_accel_error(ACCEL_LOG_WARNING, "Could not resolve _tsrm_ls_cache TLS offsets");
+			return FAILURE;
+		}
 #else
 		size_t *ti;
 
