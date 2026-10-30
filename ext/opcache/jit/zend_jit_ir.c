@@ -19,6 +19,10 @@
 #include "jit/ir/ir.h"
 #include "jit/ir/ir_builder.h"
 
+#if defined(ZTS) && (defined(__x86_64__) || defined(__aarch64__))
+# include "jit/tls/zend_jit_tls.h"
+#endif
+
 #if defined(__APPLE__) && defined(__x86_64__)
 # include <mach-o/dyld.h>
 #endif
@@ -3426,18 +3430,14 @@ static void zend_jit_setup(bool reattached)
 		tsrm_tls_index = (tlsdesc->index + 1) * 8;
 	}
 # elif defined(__MUSL__)
-	if (tsrm_ls_cache_tcb_offset == 0) {
-		size_t **where;
-
-		__asm__(
-			"adrp %0, :tlsdesc:_tsrm_ls_cache\n"
-			"add %0, %0, :tlsdesc_lo12:_tsrm_ls_cache\n"
-			: "=r" (where));
-		/* See https://github.com/ARM-software/abi-aa/blob/2a70c42d62e9c3eb5887fa50b71257f20daca6f9/aaelf64/aaelf64.rst */
-		size_t *tlsdesc = where[1];
-
-		tsrm_tls_offset = tlsdesc[1];
-		tsrm_tls_index = tlsdesc[0] * 8;
+	if (tsrm_ls_cache_tcb_offset == 0
+			&& zend_jit_resolve_tsrm_ls_cache_offsets(
+				&tsrm_ls_cache_tcb_offset, &tsrm_tls_index, &tsrm_tls_offset) == FAILURE) {
+		/* The resolver only fails when the linker rewrote the TLS descriptor
+		 * sequence into a form it does not recognize. Re-running the hand
+		 * written sequence here would read a partially relaxed descriptor,
+		 * which is the very bug this resolver fixes, so fail instead. */
+		zend_accel_error_noreturn(ACCEL_LOG_FATAL, "Could not resolve _tsrm_ls_cache TLS offsets");
 	}
 # else
 	ZEND_ASSERT(tsrm_ls_cache_tcb_offset != 0);
@@ -3522,13 +3522,10 @@ static void zend_jit_setup(bool reattached)
 			: "=r" (ret));
 		tsrm_ls_cache_tcb_offset = ret;
 #elif defined(__MUSL__)
-		size_t *ti;
-
-		__asm__(
-			"leaq _tsrm_ls_cache@tlsgd(%%rip), %0\n"
-			: "=D" (ti));
-		tsrm_tls_offset = ti[1];
-		tsrm_tls_index = ti[0] * 8;
+		if (zend_jit_resolve_tsrm_ls_cache_offsets(
+				&tsrm_ls_cache_tcb_offset, &tsrm_tls_index, &tsrm_tls_offset) == FAILURE) {
+			zend_accel_error_noreturn(ACCEL_LOG_FATAL, "Could not resolve _tsrm_ls_cache TLS offsets");
+		}
 #elif defined(__FreeBSD__)
 		size_t *ti;
 
