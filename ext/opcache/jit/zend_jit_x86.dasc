@@ -2918,13 +2918,13 @@ static int zend_jit_setup(void)
 			: "=r" (ret));
 		tsrm_ls_cache_tcb_offset = ret;
 #elif defined(__MUSL__)
-		size_t *ti;
-
-		__asm__(
-			"leaq _tsrm_ls_cache@tlsgd(%%rip), %0\n"
-			: "=a" (ti));
-		tsrm_tls_offset = ti[1];
-		tsrm_tls_index = ti[0] * 8;
+		if (zend_jit_resolve_tsrm_ls_cache_offsets(
+				&tsrm_ls_cache_tcb_offset, &tsrm_tls_index, &tsrm_tls_offset) == FAILURE) {
+			/* the resolver gives up on an unknown linker relaxation, the caller
+			 * disables the JIT when setup fails */
+			zend_accel_error(ACCEL_LOG_WARNING, "Could not resolve _tsrm_ls_cache TLS offsets");
+			return FAILURE;
+		}
 #elif defined(__FreeBSD__)
 		size_t *ti;
 
