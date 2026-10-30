@@ -3,7 +3,7 @@ ARG_ENABLE("opcache", "whether to enable Zend OPcache support", "yes");
 
 if (PHP_OPCACHE != "no") {
 
-	ARG_ENABLE("opcache-jit", "whether to enable JIT", "yes");
+	ARG_ENABLE("opcache-jit", "whether to enable JIT (not supported for ARM64)", "yes");
 
 	ZEND_EXTENSION('opcache', "\
 		ZendAccelerator.c \
@@ -19,7 +19,9 @@ if (PHP_OPCACHE != "no") {
 		shared_alloc_win32.c", true, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
 
 	if (PHP_OPCACHE_JIT == "yes") {
-		if (CHECK_HEADER_ADD_INCLUDE("dynasm/dasm_x86.h", "CFLAGS_OPCACHE", PHP_OPCACHE + ";ext\\opcache\\jit")) {
+		if (TARGET_ARCH == 'arm64') {
+			WARNING("JIT not enabled; not yet supported for ARM64");
+		} else if (CHECK_HEADER_ADD_INCLUDE("dynasm/dasm_x86.h", "CFLAGS_OPCACHE", PHP_OPCACHE + ";ext\\opcache\\jit")) {
 			var dasm_flags = (X64 ? "-D X64=1" : "") + (X64 ? " -D X64WIN=1" : "") + " -D WIN=1";
 			if (PHP_ZTS == "yes") {
 				dasm_flags += " -D ZTS=1";
